@@ -108,6 +108,7 @@ interface FuturesRowProps {
   formatOI: (oi: number) => string;
   formatTrades: (trades: number) => string;
   formatDate: (date: string) => string;
+  isChild?: boolean; // Флаг для дочерних строк (вложенных контрактов)
 }
 
 const FuturesRow = memo<FuturesRowProps>(({
@@ -120,14 +121,20 @@ const FuturesRow = memo<FuturesRowProps>(({
   formatMoneyVolume,
   formatOI,
   formatTrades,
-  formatDate
+  formatDate,
+  isChild = false
 }) => {
   const oiHighlight = future.openInterest > 100000;
   const metadata = getFutureMetadata(future);
   const isNext = metadata.type !== 'perpetual' && future.secId === frontMonthSecId && moneyVolume > 0;
   
-  // Эффект "зебры" - четные темнее, нечетные светлее
-  const bgClass = index % 2 === 0 ? 'bg-gray-900' : 'bg-gray-800/30';
+  // Для дочерних строк - темнее фон и отступ слева
+  const bgClass = isChild 
+    ? 'bg-slate-800/40' 
+    : index % 2 === 0 ? 'bg-gray-900' : 'bg-gray-800/30';
+  
+  // Отступ для дочерних строк
+  const paddingLeft = isChild ? 'pl-8' : 'pl-10';
   
   // Процент объема для прогресс-бара
   const volumePercent = maxVolume > 0 ? Math.min((moneyVolume || 0) / maxVolume * 100, 100) : 0;
@@ -135,19 +142,24 @@ const FuturesRow = memo<FuturesRowProps>(({
   return (
     <tr className={`${bgClass} hover:bg-slate-800/50 transition-colors border-b border-slate-800/50`}>
       {/* Колонка 1: Тикер + Название */}
-      <td className="px-3 py-2 pl-10">
+      <td className={`px-3 py-2 ${paddingLeft}`}>
         <div className="flex flex-col gap-1">
           {/* Верхняя строка: Тикер (крупно) + Бейджи справа */}
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-sm font-bold font-mono text-white">{future.secId}</span>
+            {isChild && (
+              <span className="text-slate-500 text-xs">└</span>
+            )}
+            <span className={`text-sm font-bold font-mono ${isChild ? 'text-slate-300' : 'text-white'}`}>
+              {future.secId}
+            </span>
             {metadata.label && (
               <span className={`px-1.5 py-0.5 text-xs font-bold rounded uppercase border ${metadata.colorClass}`}>
-                {metadata.label}
+                {metadata.type === 'mini' ? 'Mini' : metadata.type === 'perpetual' ? 'Perp' : metadata.label}
               </span>
             )}
-            {isNext && (
+            {isNext && !isChild && (
               <span className="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 text-xs font-bold rounded uppercase border border-emerald-500/30">
-                NEXT
+                Next
               </span>
             )}
           </div>
@@ -583,25 +595,32 @@ export const FuturesPage: React.FC = () => {
                         {/* Parent Row - Group Header */}
                         <tr
                           onClick={() => toggleGroup(group.assetCode)}
-                          className="hover:bg-slate-800/30 transition-colors cursor-pointer border-b border-slate-800/50"
+                          className="hover:bg-slate-800/30 transition-colors cursor-pointer border-b border-slate-800/50 bg-slate-900/50"
                         >
                           <td className="px-3 py-2">
                             <div className="flex items-center gap-2">
-                              {isExpanded ? (
-                                <ChevronDown className="w-4 h-4 text-slate-400" />
-                              ) : (
-                                <ChevronRight className="w-4 h-4 text-slate-400" />
-                              )}
+                              <div className="flex-shrink-0">
+                                {isExpanded ? (
+                                  <ChevronDown className="w-4 h-4 text-slate-400" />
+                                ) : (
+                                  <ChevronRight className="w-4 h-4 text-slate-400" />
+                                )}
+                              </div>
                               <div className="flex-1">
                                 {group.mainContract ? (
                                   <>
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 flex-wrap">
                                       <div className="text-sm font-bold font-mono text-white">
                                         {group.mainContract.secId}
                                       </div>
                                       <div className="text-xs font-semibold text-slate-400">
                                         {group.assetName}
                                       </div>
+                                      {group.futures.length > 1 && (
+                                        <span className="text-[10px] text-slate-500 font-mono">
+                                          ({group.futures.length - 1} {group.futures.length - 1 === 1 ? 'контракт' : group.futures.length - 1 < 5 ? 'контракта' : 'контрактов'})
+                                        </span>
+                                      )}
                                     </div>
                                     {!group.mainContract.isPerpetual && group.mainContract.expiryDate && (
                                       <div className="text-[10px] text-slate-500 font-mono mt-0.5">
@@ -735,26 +754,29 @@ export const FuturesPage: React.FC = () => {
                           </tr>
                         )}
                         
-                        {/* Child Rows - Futures in Group */}
-                        {isExpanded && group.futures.map((future, index) => {
-                          const moneyVolume = getMoneyVolume(future);
-                          
-                          return (
-                            <FuturesRow
-                              key={future.secId}
-                              future={future}
-                              index={index}
-                              maxVolume={maxVolume}
-                              moneyVolume={moneyVolume}
-                              frontMonthSecId={frontMonthSecId}
-                              formatPrice={formatPrice}
-                              formatMoneyVolume={formatMoneyVolume}
-                              formatOI={formatOI}
-                              formatTrades={formatTrades}
-                              formatDate={formatDate}
-                            />
-                          );
-                        })}
+                        {/* Child Rows - Futures in Group (исключаем mainContract) */}
+                        {isExpanded && group.futures
+                          .filter(future => future.secId !== group.mainContract?.secId)
+                          .map((future, index) => {
+                            const moneyVolume = getMoneyVolume(future);
+                            
+                            return (
+                              <FuturesRow
+                                key={future.secId}
+                                future={future}
+                                index={index}
+                                maxVolume={maxVolume}
+                                moneyVolume={moneyVolume}
+                                frontMonthSecId={frontMonthSecId}
+                                formatPrice={formatPrice}
+                                formatMoneyVolume={formatMoneyVolume}
+                                formatOI={formatOI}
+                                formatTrades={formatTrades}
+                                formatDate={formatDate}
+                                isChild={true}
+                              />
+                            );
+                          })}
                       </React.Fragment>
                     );
                   })

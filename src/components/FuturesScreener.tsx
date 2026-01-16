@@ -143,82 +143,107 @@ const FuturesScreener: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#E5E7EB] p-6">
+    <div className="min-h-screen bg-gray-900 p-6">
       <div className="max-w-[1800px] mx-auto">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">
+          <h1 className="text-2xl font-bold text-gray-200 mb-2">
             Futures Screener - Срочный Рынок
           </h1>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-400">
             Анализ фьючерсных контрактов • Front Month & Term Structure
           </p>
         </div>
 
         {/* Main Screener Table */}
-        <div className="bg-[#F3F4F6] border border-[#D1D5DB] rounded-none">
+        <div className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-[#E5E7EB] border-b-2 border-[#D1D5DB]">
+              <thead className="sticky top-0 bg-gray-900 border-b-2 border-[#D1D5DB] z-10">
                 <tr>
-                  <th className="text-left px-3 py-2 text-[11px] font-bold text-gray-800 uppercase">Тикер</th>
-                  <th className="text-left px-3 py-2 text-[11px] font-bold text-gray-800 uppercase">Название</th>
-                  <th className="text-left px-3 py-2 text-[11px] font-bold text-gray-800 uppercase">Front Contract</th>
-                  <th className="text-right px-3 py-2 text-[11px] font-bold text-gray-800 uppercase">Цена</th>
-                  <th className="text-center px-3 py-2 text-[11px] font-bold text-gray-800 uppercase">Изменение</th>
-                  <th className="text-right px-3 py-2 text-[11px] font-bold text-gray-800 uppercase">Объем</th>
-                  <th className="text-center px-3 py-2 text-[11px] font-bold text-gray-800 uppercase">24h</th>
-                  <th className="text-center px-3 py-2 text-[11px] font-bold text-gray-800 uppercase"></th>
+                  <th className="text-left px-3 py-2 text-[11px] font-bold text-gray-200 uppercase">Тикер</th>
+                  <th className="text-left px-3 py-2 text-[11px] font-bold text-gray-200 uppercase">Название</th>
+                  <th className="text-left px-3 py-2 text-[11px] font-bold text-gray-200 uppercase">Front Contract</th>
+                  <th className="text-right px-3 py-2 text-[11px] font-bold text-gray-200 uppercase">Цена</th>
+                  <th className="text-center px-3 py-2 text-[11px] font-bold text-gray-200 uppercase">Изменение</th>
+                  <th className="text-right px-3 py-2 text-[11px] font-bold text-gray-200 uppercase">Объем</th>
+                  <th className="text-center px-3 py-2 text-[11px] font-bold text-gray-200 uppercase">24h</th>
+                  <th className="text-center px-3 py-2 text-[11px] font-bold text-gray-200 uppercase"></th>
                 </tr>
               </thead>
               <tbody>
-                {assets.map((asset, idx) => (
-                  <tr
-                    key={idx}
-                    className="border-b border-[#E5E7EB] hover:bg-white cursor-pointer transition-colors"
-                    onClick={() => setSelectedAsset(asset)}
-                  >
-                    <td className="px-3 py-2">
-                      <span className="text-sm font-bold text-gray-800 font-mono">{asset.ticker}</span>
-                    </td>
-                    <td className="px-3 py-2">
-                      <span className="text-sm text-gray-700">{asset.name}</span>
-                    </td>
-                    <td className="px-3 py-2">
-                      <span className="text-[11px] text-gray-600 font-mono">{asset.frontContract}</span>
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      <span className="text-sm font-bold text-gray-800 font-mono">
-                        {asset.currentPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 text-center">
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold ${
-                        asset.priceChange >= 0 
-                          ? 'bg-green-100 text-green-700' 
-                          : 'bg-red-100 text-red-700'
-                      }`}>
-                        {asset.priceChange >= 0 ? (
-                          <TrendingUp className="w-3 h-3" />
-                        ) : (
-                          <TrendingDown className="w-3 h-3" />
-                        )}
-                        {asset.priceChange >= 0 ? '+' : ''}{asset.priceChange.toFixed(2)}%
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      <span className="text-[11px] text-gray-700 font-mono">
-                        {asset.totalVolume.toLocaleString()}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 text-center">
-                      {renderSparkline(asset.sparklineData)}
-                    </td>
-                    <td className="px-3 py-2 text-center">
-                      <ChevronRight className="w-4 h-4 text-gray-500" />
-                    </td>
-                  </tr>
-                ))}
+                {assets.map((asset, idx) => {
+                  const priceChangeValue = asset.priceChange;
+                  const isPricePositive = priceChangeValue > 0;
+                  const isPriceNegative = priceChangeValue < 0;
+                  const isPriceZero = priceChangeValue === 0;
+                  
+                  return (
+                    <tr
+                      key={idx}
+                      className="border-b border-gray-700 hover:bg-gray-700/50 cursor-pointer transition-colors"
+                      onClick={() => setSelectedAsset(asset)}
+                    >
+                      <td className="px-3 py-2">
+                        <span className="text-sm font-bold text-gray-200 font-mono">{asset.ticker}</span>
+                      </td>
+                      <td className="px-3 py-2">
+                        <span className="text-sm text-gray-300">{asset.name}</span>
+                      </td>
+                      <td className="px-3 py-2">
+                        <span className="text-[11px] text-gray-400 font-mono">{asset.frontContract}</span>
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <span className={`text-sm font-bold font-mono ${
+                          isPricePositive 
+                            ? 'text-green-500' 
+                            : isPriceNegative 
+                            ? 'text-red-500' 
+                            : 'text-gray-600'
+                        }`}>
+                          {asset.currentPrice === 0 || asset.currentPrice === null 
+                            ? <span className="text-gray-600">0</span>
+                            : asset.currentPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })
+                          }
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold font-mono ${
+                          isPricePositive 
+                            ? 'text-green-500' 
+                            : isPriceNegative 
+                            ? 'text-red-500' 
+                            : 'text-gray-600'
+                        }`}>
+                          {isPricePositive && <TrendingUp className="w-3 h-3" />}
+                          {isPriceNegative && <TrendingDown className="w-3 h-3" />}
+                          {isPricePositive ? '+' : ''}{priceChangeValue === 0 || priceChangeValue === null 
+                            ? <span className="text-gray-600">0</span>
+                            : priceChangeValue.toFixed(2)
+                          }%
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <span className={`text-[11px] font-mono ${
+                          asset.totalVolume === 0 || asset.totalVolume === null 
+                            ? 'text-gray-600' 
+                            : 'text-gray-300'
+                        }`}>
+                          {asset.totalVolume === 0 || asset.totalVolume === null 
+                            ? '0' 
+                            : asset.totalVolume.toLocaleString()
+                          }
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        {renderSparkline(asset.sparklineData)}
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        <ChevronRight className="w-4 h-4 text-gray-500" />
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -243,49 +268,69 @@ const FuturesScreener: React.FC = () => {
                 animate={{ x: 0 }}
                 exit={{ x: '100%' }}
                 transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-                className="fixed right-0 top-0 bottom-0 w-[900px] bg-white shadow-2xl z-50 overflow-y-auto"
+                className="fixed right-0 top-0 bottom-0 w-[900px] bg-gray-900 shadow-2xl z-50 overflow-y-auto"
               >
                 {/* Drawer Header */}
-                <div className="sticky top-0 bg-[#F3F4F6] border-b-2 border-[#D1D5DB] p-4 z-10">
+                <div className="sticky top-0 bg-gray-800 border-b-2 border-gray-700 p-4 z-10">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
                         <BarChart3 className="w-5 h-5 text-white" />
                       </div>
                       <div>
-                        <h2 className="text-xl font-bold text-gray-800">
+                        <h2 className="text-xl font-bold text-gray-200">
                           {selectedAsset.name} ({selectedAsset.ticker})
                         </h2>
-                        <p className="text-xs text-gray-600">
+                        <p className="text-xs text-gray-400">
                           Term Structure • Все контракты
                         </p>
                       </div>
                     </div>
                     <button
                       onClick={() => setSelectedAsset(null)}
-                      className="w-8 h-8 flex items-center justify-center hover:bg-gray-200 rounded transition-colors"
+                      className="w-8 h-8 flex items-center justify-center hover:bg-gray-700 rounded transition-colors"
                     >
-                      <X className="w-5 h-5 text-gray-600" />
+                      <X className="w-5 h-5 text-gray-400" />
                     </button>
                   </div>
 
                   {/* Summary Stats */}
                   <div className="grid grid-cols-3 gap-3">
-                    <div className="bg-white border border-[#D1D5DB] rounded-none p-2">
-                      <div className="text-[10px] text-gray-600 mb-1">Текущая цена</div>
-                      <div className="text-lg font-bold text-gray-800 font-mono">
-                        {selectedAsset.currentPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    <div className="bg-gray-800 border border-gray-700 rounded-lg p-2">
+                      <div className="text-[10px] text-gray-400 mb-1">Текущая цена</div>
+                      <div className={`text-lg font-bold font-mono ${
+                        selectedAsset.priceChange > 0 
+                          ? 'text-green-500' 
+                          : selectedAsset.priceChange < 0 
+                          ? 'text-red-500' 
+                          : 'text-gray-300'
+                      }`}>
+                        {selectedAsset.currentPrice === 0 || selectedAsset.currentPrice === null
+                          ? <span className="text-gray-600">0</span>
+                          : selectedAsset.currentPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })
+                        }
                       </div>
                     </div>
-                    <div className="bg-white border border-[#D1D5DB] rounded-none p-2">
-                      <div className="text-[10px] text-gray-600 mb-1">Общий объем</div>
-                      <div className="text-lg font-bold text-gray-800 font-mono">
-                        {selectedAsset.totalVolume.toLocaleString()}
+                    <div className="bg-gray-800 border border-gray-700 rounded-lg p-2">
+                      <div className="text-[10px] text-gray-400 mb-1">Общий объем</div>
+                      <div className={`text-lg font-bold font-mono ${
+                        selectedAsset.totalVolume === 0 || selectedAsset.totalVolume === null
+                          ? 'text-gray-600'
+                          : 'text-gray-200'
+                      }`}>
+                        {selectedAsset.totalVolume === 0 || selectedAsset.totalVolume === null
+                          ? '0'
+                          : selectedAsset.totalVolume.toLocaleString()
+                        }
                       </div>
                     </div>
-                    <div className="bg-white border border-[#D1D5DB] rounded-none p-2">
-                      <div className="text-[10px] text-gray-600 mb-1">Total Open Interest</div>
-                      <div className="text-lg font-bold text-blue-700 font-mono">
+                    <div className="bg-gray-800 border border-gray-700 rounded-lg p-2">
+                      <div className="text-[10px] text-gray-400 mb-1">Total Open Interest</div>
+                      <div className={`text-lg font-bold font-mono ${
+                        selectedAsset.contracts.reduce((sum, c) => sum + c.openInterest, 0) === 0
+                          ? 'text-gray-600'
+                          : 'text-blue-400'
+                      }`}>
                         {selectedAsset.contracts.reduce((sum, c) => sum + c.openInterest, 0).toLocaleString()}
                       </div>
                     </div>
@@ -295,101 +340,138 @@ const FuturesScreener: React.FC = () => {
                 {/* Term Structure Table */}
                 <div className="p-4">
                   <div className="mb-3 flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-gray-600" />
-                    <h3 className="text-sm font-bold text-gray-800">
+                    <Calendar className="w-4 h-4 text-gray-400" />
+                    <h3 className="text-sm font-bold text-gray-200">
                       Срочная структура ({selectedAsset.contracts.length} контрактов)
                     </h3>
                   </div>
 
-                  <div className="bg-[#F3F4F6] border border-[#D1D5DB] rounded-none overflow-hidden">
-                    <table className="w-full">
-                      <thead className="bg-[#E5E7EB] border-b border-[#D1D5DB]">
-                        <tr>
-                          <th className="text-left px-3 py-2 text-[10px] font-bold text-gray-800 uppercase">Контракт</th>
-                          <th className="text-left px-3 py-2 text-[10px] font-bold text-gray-800 uppercase">Экспирация</th>
-                          <th className="text-right px-3 py-2 text-[10px] font-bold text-gray-800 uppercase">Цена</th>
-                          <th className="text-left px-3 py-2 text-[10px] font-bold text-gray-800 uppercase">Volume</th>
-                          <th className="text-left px-3 py-2 text-[10px] font-bold text-gray-800 uppercase">Open Interest</th>
-                          <th className="text-center px-3 py-2 text-[10px] font-bold text-gray-800 uppercase">Days to Exp</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {selectedAsset.contracts.map((contract, idx) => {
-                          const isFrontMonth = idx === 0;
-                          const volumePercent = (contract.volume / maxVolume) * 100;
-                          const oiPercent = (contract.openInterest / maxOI) * 100;
-                          
-                          return (
-                            <tr
-                              key={idx}
-                              className={`border-b border-[#E5E7EB] ${
-                                isFrontMonth ? 'bg-yellow-50' : 'bg-white'
-                              }`}
-                            >
-                              <td className="px-3 py-2">
-                                <div className="flex items-center gap-2">
-                                  {isFrontMonth && (
-                                    <span className="px-1.5 py-0.5 bg-orange-500 text-white text-[9px] font-bold rounded">
-                                      FRONT
+                  <div className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
+                    <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+                      <table className="w-full">
+                        <thead className="sticky top-0 bg-gray-900 border-b border-[#D1D5DB] z-10">
+                          <tr>
+                            <th className="text-left px-3 py-2 text-[10px] font-bold text-gray-200 uppercase">Контракт</th>
+                            <th className="text-left px-3 py-2 text-[10px] font-bold text-gray-200 uppercase">Экспирация</th>
+                            <th className="text-right px-3 py-2 text-[10px] font-bold text-gray-200 uppercase">Цена</th>
+                            <th className="text-left px-3 py-2 text-[10px] font-bold text-gray-200 uppercase">Volume</th>
+                            <th className="text-left px-3 py-2 text-[10px] font-bold text-gray-200 uppercase">Open Interest</th>
+                            <th className="text-center px-3 py-2 text-[10px] font-bold text-gray-200 uppercase">Days to Exp</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedAsset.contracts.map((contract, idx) => {
+                            const isFrontMonth = idx === 0;
+                            const volumePercent = (contract.volume / maxVolume) * 100;
+                            const oiPercent = (contract.openInterest / maxOI) * 100;
+                            const priceChange = idx > 0 
+                              ? ((contract.lastPrice - selectedAsset.contracts[0].lastPrice) / selectedAsset.contracts[0].lastPrice) * 100
+                              : 0;
+                            const isPricePositive = priceChange > 0;
+                            const isPriceNegative = priceChange < 0;
+                            
+                            return (
+                              <tr
+                                key={idx}
+                                className={`border-b border-gray-700 hover:bg-gray-700/50 transition-colors ${
+                                  isFrontMonth ? 'bg-yellow-900/20' : 'bg-gray-800/30'
+                                }`}
+                              >
+                                <td className="px-3 py-2">
+                                  <div className="flex items-center gap-2">
+                                    {isFrontMonth && (
+                                      <span className="px-1.5 py-0.5 bg-orange-500 text-white text-[9px] font-bold rounded">
+                                        FRONT
+                                      </span>
+                                    )}
+                                    <span className="text-[11px] font-bold text-gray-200 font-mono">
+                                      {contract.contractCode}
                                     </span>
-                                  )}
-                                  <span className="text-[11px] font-bold text-gray-800 font-mono">
-                                    {contract.contractCode}
-                                  </span>
-                                </div>
-                              </td>
-                              <td className="px-3 py-2">
-                                <span className="text-[11px] text-gray-700 font-mono">
-                                  {contract.expirationDate}
-                                </span>
-                              </td>
-                              <td className="px-3 py-2 text-right">
-                                <span className="text-[11px] font-bold text-gray-800 font-mono">
-                                  {contract.lastPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                                </span>
-                              </td>
-                              <td className="px-3 py-2">
-                                <div className="flex items-center gap-2">
-                                  <div className="relative flex-1 h-5 bg-gray-200">
-                                    <div
-                                      className="absolute inset-y-0 left-0 bg-green-400"
-                                      style={{ width: `${volumePercent}%` }}
-                                    />
                                   </div>
-                                  <span className="text-[10px] text-gray-700 font-mono w-16 text-right">
-                                    {contract.volume.toLocaleString()}
+                                </td>
+                                <td className="px-3 py-2">
+                                  <span className="text-[11px] text-gray-300 font-mono">
+                                    {contract.expirationDate}
                                   </span>
-                                </div>
-                              </td>
-                              <td className="px-3 py-2">
-                                <div className="flex items-center gap-2">
-                                  <div className="relative flex-1 h-5 bg-gray-200">
-                                    <div
-                                      className="absolute inset-y-0 left-0 bg-blue-500"
-                                      style={{ width: `${oiPercent}%` }}
-                                    />
+                                </td>
+                                <td className="px-3 py-2 text-right">
+                                  <span className={`text-[11px] font-bold font-mono ${
+                                    contract.lastPrice === 0 || contract.lastPrice === null
+                                      ? 'text-gray-600'
+                                      : isPricePositive
+                                      ? 'text-green-500'
+                                      : isPriceNegative
+                                      ? 'text-red-500'
+                                      : 'text-gray-300'
+                                  }`}>
+                                    {contract.lastPrice === 0 || contract.lastPrice === null
+                                      ? '0'
+                                      : contract.lastPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })
+                                    }
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2">
+                                  <div className="flex items-center gap-2">
+                                    <div className="relative flex-1 h-5 bg-gray-200">
+                                      <div
+                                        className="absolute inset-y-0 left-0 bg-green-400"
+                                        style={{ width: `${volumePercent}%` }}
+                                      />
+                                    </div>
+                                    <span className={`text-[10px] font-mono w-16 text-right ${
+                                      contract.volume === 0 || contract.volume === null
+                                        ? 'text-gray-600'
+                                        : 'text-gray-300'
+                                    }`}>
+                                      {contract.volume === 0 || contract.volume === null
+                                        ? '0'
+                                        : contract.volume.toLocaleString()
+                                      }
+                                    </span>
                                   </div>
-                                  <span className="text-[10px] text-blue-700 font-mono font-bold w-16 text-right">
-                                    {contract.openInterest.toLocaleString()}
+                                </td>
+                                <td className="px-3 py-2">
+                                  <div className="flex items-center gap-2">
+                                    <div className="relative flex-1 h-5 bg-gray-200">
+                                      <div
+                                        className="absolute inset-y-0 left-0 bg-blue-500"
+                                        style={{ width: `${oiPercent}%` }}
+                                      />
+                                    </div>
+                                    <span className={`text-[10px] font-mono font-bold w-16 text-right ${
+                                      contract.openInterest === 0 || contract.openInterest === null
+                                        ? 'text-gray-600'
+                                        : 'text-blue-400'
+                                    }`}>
+                                      {contract.openInterest === 0 || contract.openInterest === null
+                                        ? '0'
+                                        : contract.openInterest.toLocaleString()
+                                      }
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="px-3 py-2 text-center">
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono ${
+                                    contract.daysToExpiration === 0 || contract.daysToExpiration === null
+                                      ? 'bg-gray-100 text-gray-600'
+                                      : contract.daysToExpiration < 30 
+                                      ? 'bg-red-100 text-red-700'
+                                      : contract.daysToExpiration < 90
+                                      ? 'bg-yellow-100 text-yellow-700'
+                                      : 'bg-gray-100 text-gray-700'
+                                  }`}>
+                                    {contract.daysToExpiration === 0 || contract.daysToExpiration === null
+                                      ? '0'
+                                      : `${contract.daysToExpiration}d`
+                                    }
                                   </span>
-                                </div>
-                              </td>
-                              <td className="px-3 py-2 text-center">
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                  contract.daysToExpiration < 30 
-                                    ? 'bg-red-100 text-red-700'
-                                    : contract.daysToExpiration < 90
-                                    ? 'bg-yellow-100 text-yellow-700'
-                                    : 'bg-gray-100 text-gray-700'
-                                }`}>
-                                  {contract.daysToExpiration}d
-                                </span>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
 
                   {/* Educational Info */}
