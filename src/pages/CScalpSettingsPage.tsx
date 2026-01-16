@@ -37,6 +37,10 @@ interface StockCalculation {
   makerCommissionPoints: number; // Комиссия Maker в пунктах
   takerCommissionRub: number; // Комиссия Taker в рублях
   takerCommissionPoints: number; // Комиссия Taker в пунктах
+  commissionOnPositionRub: number; // Комиссия на объем позиции в рублях (за круг: вход + выход)
+  commissionOnPositionPoints: number; // Комиссия на объем позиции в пунктах
+  pureLossRub: number; // Чистый убыток (без комиссии) в рублях
+  totalLossRub: number; // Полный убыток (с комиссией) в рублях
 }
 
 export const CScalpSettingsPage: React.FC = () => {
@@ -49,9 +53,9 @@ export const CScalpSettingsPage: React.FC = () => {
 
   // Параметры риска
   const [riskParams, setRiskParams] = useState<RiskParams>({
-    dailyDrawdown: 5000, // 5 000 рублей
-    riskDivider: 20, // Делитель риска (риск на сделку = 5000 / 20 = 250 ₽)
-    stopLossPercent: 0.10 // Стоп-лосс (%)
+    dailyDrawdown: 1000, // 1 000 рублей
+    riskDivider: 10, // Делитель риска (риск на сделку = 1000 / 10 = 100 ₽)
+    stopLossPercent: 0.25 // Стоп-лосс (%)
   });
 
   // Популярные значения стоп-лосса (магнитные точки)
@@ -122,13 +126,17 @@ export const CScalpSettingsPage: React.FC = () => {
     if (stock.minStep === 0 || stock.last === 0) return 0;
     // StopPoints = (LastPrice * stopLossPercent) / MinStep
     const stopPercentInPrice = stock.last * (riskParams.stopLossPercent / 100);
-    return stopPercentInPrice / stock.minStep;
+    // Округляем вверх до целого числа
+    return Math.ceil(stopPercentInPrice / stock.minStep);
   };
 
   // Расчет убытка в рублях для объема
+  // Используем формулу: Пункты * Стоимость Шага * Кол-во Лотов
   const calculateLoss = (volume: number, stock: ProcessedStockSpec): number => {
-    const volumeInMoney = volume * stock.last * stock.lotSize;
-    return volumeInMoney * (riskParams.stopLossPercent / 100);
+    const stopPoints = calculateStopPoints(stock);
+    const costOfStep = stock.costOfStep; // Цена одного шага в рублях
+    // Убыток = Стоп в пунктах * Стоимость шага * Количество лотов
+    return stopPoints * costOfStep * volume;
   };
 
   // Расчет BaseVolume на основе риска с учетом динамического стопа
@@ -180,16 +188,30 @@ export const CScalpSettingsPage: React.FC = () => {
     // Стоп-лосс в пунктах
     const stopInPoints = calculateStopPoints(stock);
 
-    // Комиссии Maker и Taker
-    const MAKER_RATE = 0.0002; // 0.02%
-    const TAKER_RATE = 0.00045; // 0.045%
+    // Комиссии на позицию (V4 - базовый объем)
+    const COMMISSION_RATE = 0.0004; // 0.04% базовая ставка комиссии
     const costOfStep = stock.costOfStep; // Цена шага в рублях
     
-    const makerCommissionRub = stock.last * stock.lotSize * MAKER_RATE;
-    const takerCommissionRub = stock.last * stock.lotSize * TAKER_RATE;
+    // Комиссия рассчитывается на объем позиции: Цена * lotSize * Кол-во Лотов * Ставка
+    const positionVolumeInMoney = volumes.v4 * stock.last * stock.lotSize;
+    // Комиссия за круг (вход + выход): Taker rate * 2 * Объем
+    const commissionRoundRub = positionVolumeInMoney * COMMISSION_RATE * 2; // Вход + Выход
+    
+    const makerCommissionRub = positionVolumeInMoney * COMMISSION_RATE;
+    const takerCommissionRub = positionVolumeInMoney * COMMISSION_RATE;
     
     const makerCommissionPoints = costOfStep > 0 ? makerCommissionRub / costOfStep : 0;
     const takerCommissionPoints = costOfStep > 0 ? takerCommissionRub / costOfStep : 0;
+
+    // Комиссия на объем позиции (для отображения)
+    const commissionOnPositionRub = commissionRoundRub; // Комиссия за круг (вход + выход)
+    const commissionOnPositionPoints = costOfStep > 0 ? commissionRoundRub / costOfStep : 0;
+
+    // Чистый убыток (без комиссии) на базовый объем
+    const pureLossRub = stopInPoints * costOfStep * volumes.v4;
+    
+    // Полный убыток (с комиссией)
+    const totalLossRub = pureLossRub + commissionRoundRub;
 
     // Стакан
     const orderbook: OrderbookSettings = {
@@ -213,7 +235,11 @@ export const CScalpSettingsPage: React.FC = () => {
       makerCommissionRub,
       makerCommissionPoints,
       takerCommissionRub,
-      takerCommissionPoints
+      takerCommissionPoints,
+      commissionOnPositionRub,
+      commissionOnPositionPoints,
+      pureLossRub,
+      totalLossRub
     };
   };
 
@@ -441,7 +467,7 @@ export const CScalpSettingsPage: React.FC = () => {
                         const value = e.target.value.replace(/\D/g, '');
                         setRiskParams(prev => ({ ...prev, dailyDrawdown: parseFloat(value) || 0 }));
                       }}
-                      className="w-32 px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white font-mono text-2xl font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-32 px-4 py-2 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400 font-mono text-2xl font-bold focus:outline-none focus:ring-2 focus:ring-red-500"
                     />
                     {/* Цифровая клавиатура */}
                     <div className="flex-1 grid grid-cols-4 gap-1.5">
@@ -532,6 +558,9 @@ export const CScalpSettingsPage: React.FC = () => {
                     <span>1</span>
                     <span>50</span>
                   </div>
+                  <p className="text-xs text-slate-500 mt-2">
+                    Количество убыточных сделок подряд до достижения лимита просадки.
+                  </p>
                   <div className={`mt-2 p-3 rounded-lg border ${
                     riskParams.riskDivider <= 4 ? 'bg-red-900/20 border-red-500/30' :
                     riskParams.riskDivider <= 10 ? 'bg-orange-900/20 border-orange-500/30' :
@@ -542,9 +571,7 @@ export const CScalpSettingsPage: React.FC = () => {
                       riskParams.riskDivider <= 10 ? 'text-orange-300' :
                       'text-green-300'
                     }`}>
-                      {riskParams.riskDivider <= 4 ? 'АГРЕССИВНЫЙ' :
-                       riskParams.riskDivider <= 10 ? 'УМЕРЕННЫЙ' :
-                       'НИЗКИЙ РИСК'}
+                      Запас: <span className="font-mono font-bold">{riskParams.riskDivider}</span> стопов
                     </p>
                     <p className={`text-sm ${
                       riskParams.riskDivider <= 4 ? 'text-red-300' :
@@ -578,16 +605,11 @@ export const CScalpSettingsPage: React.FC = () => {
                     type="range"
                     min="0.1"
                     max="2.0"
-                    step={riskParams.stopLossPercent < 0.5 ? 0.01 : 0.1}
+                    step={0.01}
                     value={riskParams.stopLossPercent}
                     onChange={(e) => {
                       const value = parseFloat(e.target.value);
-                      // Автоматически переключаем шаг при пересечении 0.5%
-                      if (value < 0.5) {
-                        setRiskParams(prev => ({ ...prev, stopLossPercent: Math.round(value * 100) / 100 }));
-                      } else {
-                        setRiskParams(prev => ({ ...prev, stopLossPercent: Math.round(value * 10) / 10 }));
-                      }
+                      setRiskParams(prev => ({ ...prev, stopLossPercent: Math.round(value * 100) / 100 }));
                     }}
                     className="w-full h-3 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-red-500"
                     style={{
@@ -722,23 +744,31 @@ export const CScalpSettingsPage: React.FC = () => {
                       <span className="text-white font-mono ml-2">{selectedCalculation.stock.lotSize}</span>
                     </div>
                     <div>
-                      <span className="text-slate-400">Стоп (п.):</span>
-                      <span className="text-red-400 font-mono ml-2 font-semibold">{selectedCalculation.stopInPoints.toFixed(1)}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400">V4 (Базовый):</span>
-                      <span className="text-green-400 font-mono ml-2">{selectedCalculation.volumes.v4}</span>
+                      <span className="text-slate-400">Базовый объем:</span>
+                      <span className="text-green-400 font-mono ml-2 font-semibold">{selectedCalculation.volumes.v4}</span>
                     </div>
                   </div>
                   
-                  {/* Комиссия на лот */}
+                  {/* Полная декомпозиция риска */}
                   <div className="mt-4 pt-4 border-t border-slate-700">
-                    <div className="text-sm font-mono space-y-2">
-                      <div className="text-slate-300">
-                        Комиссия (Maker): <span className="text-white font-semibold">{selectedCalculation.makerCommissionRub.toFixed(2)} ₽</span> | <span className="text-slate-400">{selectedCalculation.makerCommissionPoints.toFixed(1)} п.</span>
+                    <h3 className="text-sm font-semibold text-slate-300 mb-3">Декомпозиция стоп-лосса</h3>
+                    <div className="space-y-2 text-sm font-mono">
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-400">Стоп (п):</span>
+                        <span className="text-red-400 font-semibold">{selectedCalculation.stopInPoints}</span>
                       </div>
-                      <div className="text-slate-300">
-                        Комиссия (Taker): <span className="text-white font-semibold">{selectedCalculation.takerCommissionRub.toFixed(2)} ₽</span> | <span className="text-slate-400">{selectedCalculation.takerCommissionPoints.toFixed(1)} п.</span>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-400">Чистый убыток:</span>
+                        <span className="text-slate-300">{selectedCalculation.pureLossRub.toFixed(2)} ₽</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-400">Комиссия (круг):</span>
+                        <span className="text-slate-300">{selectedCalculation.commissionOnPositionRub.toFixed(2)} ₽</span>
+                        <span className="text-xs text-slate-500 ml-2">(0.04% × 2)</span>
+                      </div>
+                      <div className="flex justify-between items-center pt-2 border-t border-slate-700">
+                        <span className="text-slate-300 font-semibold">ПОЛНЫЙ УБЫТОК:</span>
+                        <span className="text-red-400 font-bold text-lg">{selectedCalculation.totalLossRub.toFixed(2)} ₽</span>
                       </div>
                     </div>
                   </div>
@@ -767,10 +797,10 @@ export const CScalpSettingsPage: React.FC = () => {
                     <tr className="border-b-2 border-slate-600">
                       <th rowSpan={2} className="text-left py-3 px-4 text-slate-300 font-bold text-xs uppercase tracking-wider border-r-2 border-slate-600">Инструмент</th>
                       <th rowSpan={2} className="text-right py-3 px-4 text-slate-300 font-bold text-xs uppercase tracking-wider border-r-2 border-slate-600">Цена</th>
-                      <th rowSpan={2} className="text-right py-3 px-4 text-slate-300 font-bold text-xs uppercase tracking-wider border-r-2 border-slate-600">СТОП (п)</th>
-                      <th colSpan={1} className="text-center py-2 px-4 text-slate-300 font-bold text-xs uppercase tracking-wider border-r-2 border-slate-600">МАЯК</th>
+                      <th rowSpan={2} className="text-right py-3 px-4 text-slate-300 font-bold text-xs uppercase tracking-wider border-r-2 border-slate-600">СТОП</th>
+                      <th colSpan={1} className="text-center py-2 px-4 text-slate-400 font-bold text-xs uppercase tracking-wider border-r-2 border-slate-600">Маячок</th>
                       <th colSpan={3} className="text-center py-2 px-4 text-slate-300 font-bold text-xs uppercase tracking-wider border-r-2 border-slate-600">РАБОЧИЕ</th>
-                      <th colSpan={1} className="text-center py-2 px-4 text-slate-300 font-bold text-xs uppercase tracking-wider border-r-2 border-slate-600">УДАРНЫЙ</th>
+                      <th colSpan={1} className="text-center py-2 px-4 text-orange-400 font-bold text-xs uppercase tracking-wider border-r-2 border-slate-600">Х2</th>
                     </tr>
                     {/* Индивидуальные заголовки */}
                     <tr className="border-b border-slate-700 bg-slate-800/30">
@@ -779,7 +809,7 @@ export const CScalpSettingsPage: React.FC = () => {
                         className="text-right py-3 px-4 text-slate-400 font-semibold cursor-pointer hover:bg-slate-700/50 transition-colors border-r-2 border-slate-600"
                       >
                         <div className="flex items-center justify-end gap-1.5">
-                          <span>V1</span>
+                          <span>Маячок</span>
                           {sortConfig.key === 'v1' && (
                             sortConfig.direction === 'asc' 
                               ? <ChevronUp className="w-3 h-3 text-blue-400" />
@@ -792,7 +822,7 @@ export const CScalpSettingsPage: React.FC = () => {
                         className="text-right py-3 px-4 text-slate-400 font-semibold cursor-pointer hover:bg-slate-700/50 transition-colors border-r border-slate-600"
                       >
                         <div className="flex items-center justify-end gap-1.5">
-                          <span>V2</span>
+                          <span>Четверть</span>
                           {sortConfig.key === 'v2' && (
                             sortConfig.direction === 'asc' 
                               ? <ChevronUp className="w-3 h-3 text-blue-400" />
@@ -805,7 +835,7 @@ export const CScalpSettingsPage: React.FC = () => {
                         className="text-right py-3 px-4 text-slate-400 font-semibold cursor-pointer hover:bg-slate-700/50 transition-colors border-r border-slate-600"
                       >
                         <div className="flex items-center justify-end gap-1.5">
-                          <span>V3</span>
+                          <span>Половинка</span>
                           {sortConfig.key === 'v3' && (
                             sortConfig.direction === 'asc' 
                               ? <ChevronUp className="w-3 h-3 text-blue-400" />
@@ -815,10 +845,10 @@ export const CScalpSettingsPage: React.FC = () => {
                       </th>
                       <th 
                         onClick={() => handleSort('v4')}
-                        className="text-right py-3 px-4 text-green-400 font-semibold cursor-pointer hover:bg-slate-700/50 transition-colors border-r-2 border-slate-600"
+                        className="text-right py-3 px-4 text-white font-semibold cursor-pointer hover:bg-slate-700/50 transition-colors border-r-2 border-slate-600"
                       >
                         <div className="flex items-center justify-end gap-1.5">
-                          <span>V4 (Базовый)</span>
+                          <span>Базовый</span>
                           {sortConfig.key === 'v4' && (
                             sortConfig.direction === 'asc' 
                               ? <ChevronUp className="w-3 h-3 text-blue-400" />
@@ -828,10 +858,10 @@ export const CScalpSettingsPage: React.FC = () => {
                       </th>
                       <th 
                         onClick={() => handleSort('v5')}
-                        className="text-right py-3 px-4 text-slate-400 font-semibold cursor-pointer hover:bg-slate-700/50 transition-colors border-r-2 border-slate-600"
+                        className="text-right py-3 px-4 text-orange-400 font-semibold cursor-pointer hover:bg-slate-700/50 transition-colors border-r-2 border-slate-600"
                       >
                         <div className="flex items-center justify-end gap-1.5">
-                          <span>V5</span>
+                          <span>Х2</span>
                           {sortConfig.key === 'v5' && (
                             sortConfig.direction === 'asc' 
                               ? <ChevronUp className="w-3 h-3 text-blue-400" />
@@ -876,8 +906,15 @@ export const CScalpSettingsPage: React.FC = () => {
                           <td className="py-3 px-4 text-right font-mono text-slate-300 border-r-2 border-slate-600">
                             {calc.stock.last.toFixed(2)}
                           </td>
-                          <td className="py-3 px-4 text-right font-mono text-slate-300 border-r-2 border-slate-600">
-                            {calc.stopInPoints.toFixed(1)}
+                          <td className="py-3 px-4 text-right border-r-2 border-slate-600">
+                            <div className="flex flex-col items-end">
+                              <span className="text-red-400 font-mono font-semibold text-sm">
+                                {calc.stopInPoints} п.
+                              </span>
+                              <span className="text-red-500 font-mono text-xs leading-tight mt-0.5">
+                                | -{calc.totalLossRub.toFixed(0)} ₽
+                              </span>
+                            </div>
                           </td>
                           <td className="py-3 px-4 text-right border-r-2 border-slate-600">
                             {renderVolumeCell(calc.volumes.v1)}
@@ -940,32 +977,24 @@ export const CScalpSettingsPage: React.FC = () => {
                     <h3 className="text-sm font-semibold text-slate-400 mb-3">Рабочие объемы</h3>
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
-                        <span className="text-slate-400">V1:</span>
-                        <span className="text-white font-mono">{selectedCalculation.volumes.v1.toLocaleString('ru-RU')}</span>
+                        <span className="text-slate-400">Маячок:</span>
+                        <span className="text-slate-300 font-mono">{selectedCalculation.volumes.v1.toLocaleString('ru-RU')}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-slate-400">V1 (Маячок):</span>
-                        <span className="text-white font-mono">{selectedCalculation.volumes.v1.toLocaleString('ru-RU')}</span>
+                        <span className="text-slate-400">Четверть:</span>
+                        <span className="text-slate-300 font-mono">{selectedCalculation.volumes.v2.toLocaleString('ru-RU')}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-slate-400">V2:</span>
-                        <span className="text-white font-mono">{selectedCalculation.volumes.v2.toLocaleString('ru-RU')}</span>
+                        <span className="text-slate-400">Половинка:</span>
+                        <span className="text-slate-300 font-mono">{selectedCalculation.volumes.v3.toLocaleString('ru-RU')}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-slate-400">V3:</span>
-                        <span className="text-white font-mono">{selectedCalculation.volumes.v3.toLocaleString('ru-RU')}</span>
+                        <span className="text-slate-400">Базовый:</span>
+                        <span className="text-white font-mono font-semibold">{selectedCalculation.volumes.v4.toLocaleString('ru-RU')}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-slate-400">V4 (Базовый):</span>
-                        <span className="text-green-400 font-mono font-semibold">{selectedCalculation.volumes.v4.toLocaleString('ru-RU')}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">V5 (Ударный):</span>
-                        <span className="text-white font-mono">{selectedCalculation.volumes.v5.toLocaleString('ru-RU')}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">V5:</span>
-                        <span className="text-white font-mono">{selectedCalculation.volumes.v5.toLocaleString('ru-RU')}</span>
+                        <span className="text-slate-400">Х2:</span>
+                        <span className="text-orange-400 font-mono">{selectedCalculation.volumes.v5.toLocaleString('ru-RU')}</span>
                       </div>
                     </div>
                   </div>
