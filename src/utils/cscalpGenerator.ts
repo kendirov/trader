@@ -9,6 +9,14 @@ import { StockTableRow } from '../api/stocks';
 export async function generateCScalpSettings(stocks: StockTableRow[]): Promise<Blob> {
   const zip = new JSZip();
   
+  // Создаем строгую структуру папок: Data -> MVS
+  const dataFolder = zip.folder('Data');
+  const mvsFolder = dataFolder?.folder('MVS');
+  
+  if (!mvsFolder) {
+    throw new Error('Не удалось создать структуру папок');
+  }
+  
   // Фильтруем только акции (не индексы) с валидными данными
   const validStocks = stocks.filter(stock => 
     !stock.isIndex && 
@@ -20,12 +28,17 @@ export async function generateCScalpSettings(stocks: StockTableRow[]): Promise<B
   // Генерируем XML файл для каждой акции
   for (const stock of validStocks) {
     const xmlContent = generateStockXML(stock);
-    const filePath = `Data/MVS/XDSD.TQBR.${stock.secId}_Settings.xml`;
-    zip.file(filePath, xmlContent);
+    const fileName = `XDSD.TQBR.${stock.secId}_Settings.xml`;
+    mvsFolder.file(fileName, xmlContent);
   }
 
   // Генерируем ZIP-архив
-  const blob = await zip.generateAsync({ type: 'blob' });
+  const blob = await zip.generateAsync({ 
+    type: 'blob',
+    compression: 'DEFLATE',
+    compressionOptions: { level: 9 }
+  });
+  
   return blob;
 }
 
@@ -36,19 +49,7 @@ function generateStockXML(stock: StockTableRow): string {
   // Базовые параметры
   const lotSize = stock.lotSize || 1;
   const price = stock.price;
-  const minStep = 0.01; // Стандартный шаг для акций MOEX
   
-  // Объем в лотах (если volume в рублях, переводим в лоты)
-  const volumeInLots = stock.volume > 0 && price > 0 && lotSize > 0
-    ? Math.round(stock.volume / (price * lotSize))
-    : 1000; // Fallback значение
-
-  // Крупные объемы (в лотах)
-  const largeVol1 = Math.max(100, Math.round(volumeInLots / 100)); // 1% от дневного объема, минимум 100
-  const largeVol2 = largeVol1 * 2;
-  const domFill = Math.max(1, Math.round(largeVol1 / 2));
-  const clusterFill = largeVol1;
-
   // Рабочие объемы (Working Volumes) - 5 кнопок
   // Рассчитываем лоты для сумм: 10 000₽, 20 000₽, 50 000₽, 100 000₽, 200 000₽
   const workAmounts = [10000, 20000, 50000, 100000, 200000];
@@ -59,8 +60,24 @@ function generateStockXML(stock: StockTableRow): string {
     return 1;
   });
 
-  // Генерация XML
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+  // Крупные объемы (Big Volumes) - в лотах
+  // BigVol1 = stock.volume / 2000 (примерно 0.05% от дневного), но не меньше 100 лотов
+  // Если volume в рублях, переводим в лоты
+  const volumeInLots = stock.volume > 0 && price > 0 && lotSize > 0
+    ? Math.round(stock.volume / (price * lotSize))
+    : 10000; // Fallback значение
+  
+  const bigVol1 = Math.max(100, Math.round(volumeInLots / 2000));
+  const bigVol2 = bigVol1 * 2;
+  
+  // DomFill (Заполнение строки) = BigVol1
+  const domFill = bigVol1;
+  
+  // ClusterFill (Заполнение кластера) = BigVol1
+  const clusterFill = bigVol1;
+
+  // Генерация XML с правильной структурой
+  const xml = `<?xml version="1.0" encoding="utf-8"?>
 <Settings>
   <Shared>
     <WorkingAmounts>
@@ -72,16 +89,13 @@ function generateStockXML(stock: StockTableRow): string {
     </WorkingAmounts>
     <DomParams>
       <FillAmount Value="${domFill}" />
-      <BigAmount1 Value="${largeVol1}" />
-      <BigAmount2 Value="${largeVol2}" />
+      <BigAmount1 Value="${bigVol1}" />
+      <BigAmount2 Value="${bigVol2}" />
     </DomParams>
     <ClusterParams>
       <FillAmount Value="${clusterFill}" />
       <TimeFrame Value="3600" />
     </ClusterParams>
-    <RulerParams>
-      <StepPrice Value="${minStep}" />
-    </RulerParams>
   </Shared>
 </Settings>`;
 
@@ -89,16 +103,14 @@ function generateStockXML(stock: StockTableRow): string {
 }
 
 /**
- * Скачивает файл настроек CScalp
+ * Скачивает файл настроек CScalp с расширением .scs
  */
 export async function downloadCScalpSettings(stocks: StockTableRow[]): Promise<void> {
   try {
     const blob = await generateCScalpSettings(stocks);
     
-    // Формируем имя файла с датой
-    const date = new Date();
-    const dateStr = date.toISOString().split('T')[0].replace(/-/g, '');
-    const fileName = `CScalp_Settings_${dateStr}.scs`;
+    // Формируем имя файла
+    const fileName = 'CScalp_Screener_Settings.scs';
     
     // Создаем ссылку для скачивания
     const url = URL.createObjectURL(blob);
